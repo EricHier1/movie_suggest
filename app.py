@@ -87,12 +87,22 @@ def cosine_heatmap():
 
 @app.route("/genre-distribution", methods=["GET"])
 def genre_distribution():
-    genre_counts = df["listed_in"].str.split(", ").explode().value_counts().head(10)
+    movie_title = request.args.get("title")
+    if not movie_title or movie_title not in df["title"].values:
+        return jsonify({"error": "Movie not found"}), 404  # Return 404 if the movie is missing
 
-    # Create pie chart
+    # Get genres for the specific movie
+    movie_genres = df[df["title"] == movie_title]["listed_in"].values[0]
+    if not movie_genres:
+        return jsonify({"error": "No genres available for this movie."}), 404
+
+    # Split genres and count occurrences
+    genre_counts = pd.Series(movie_genres.split(", ")).value_counts()
+
+    # Create pie chart for the selected movie
     plt.figure(figsize=(8, 8))
     plt.pie(genre_counts, labels=genre_counts.index, autopct="%1.1f%%", colors=sns.color_palette("pastel"))
-    plt.title("Top 10 Movie Genres")
+    plt.title(f"Genre Distribution for '{movie_title}'")
 
     # Save plot to a byte stream
     img = BytesIO()
@@ -101,6 +111,43 @@ def genre_distribution():
     genre_chart_url = base64.b64encode(img.getvalue()).decode()
 
     return jsonify({"genre_chart": f"data:image/png;base64,{genre_chart_url}"})
+
+@app.route("/feature-importance", methods=["GET"])
+def feature_importance():
+    movie_title = request.args.get("title")
+    if movie_title not in df["title"].values:
+        return jsonify({"error": "Movie not found"}), 404
+
+    # Get the index of the selected movie
+    idx = df[df["title"] == movie_title].index[0]
+    
+    # Get the TF-IDF scores for that movie
+    feature_array = np.array(tfidf.get_feature_names_out())
+    tfidf_scores = tfidf_matrix[idx].toarray().flatten()
+    
+    # Check if we have valid scores
+    if len(tfidf_scores) == 0:
+        return jsonify({"error": "No TF-IDF scores found for this movie."}), 500
+
+    # Get top 10 most important words
+    top_indices = tfidf_scores.argsort()[-10:][::-1]
+    top_words = feature_array[top_indices]
+    top_scores = tfidf_scores[top_indices]
+
+    # Create bar chart
+    plt.figure(figsize=(8, 6))
+    plt.barh(top_words[::-1], top_scores[::-1], color="royalblue")
+    plt.xlabel("TF-IDF Score")
+    plt.ylabel("Words")
+    plt.title(f"Top Words in '{movie_title}'")
+
+    # Save plot to a byte stream
+    img = BytesIO()
+    plt.savefig(img, format="png", bbox_inches="tight")
+    img.seek(0)
+    feature_chart_url = base64.b64encode(img.getvalue()).decode()
+
+    return jsonify({"feature_chart": f"data:image/png;base64,{feature_chart_url}"})
 
 if __name__ == "__main__":
     app.run(debug=True)
