@@ -17,6 +17,31 @@
             <div id="autocompleteBox" class="autocomplete-box position-absolute w-100 bg-white border rounded shadow-sm"></div>
         </div>
 
+        <!-- Sliders for Custom Weights -->
+        <div class="mt-4">
+            <h4>Customize Recommendation Priorities</h4>
+
+            <div class="slider-container">
+                <label for="genreWeight">Genre Weight: <span id="genreValue">0.5</span></label>
+                <input type="range" id="genreWeight" min="0" max="1" step="0.1" value="0.5">
+            </div>
+
+            <div class="slider-container">
+                <label for="descWeight">Description Weight: <span id="descValue">0.5</span></label>
+                <input type="range" id="descWeight" min="0" max="1" step="0.1" value="0.5">
+            </div>
+
+            <div class="slider-container">
+                <label for="directorWeight">Director Weight: <span id="directorValue">0.3</span></label>
+                <input type="range" id="directorWeight" min="0" max="1" step="0.1" value="0.3">
+            </div>
+
+            <div class="slider-container">
+                <label for="castWeight">Cast Weight: <span id="castValue">0.3</span></label>
+                <input type="range" id="castWeight" min="0" max="1" step="0.1" value="0.3">
+            </div>
+        </div>
+
         <button class="btn btn-primary mt-3" id="getRecommendations">Get Recommendations</button>
         
         <!-- Loading Indicator -->
@@ -47,5 +72,23 @@
     </div>
 
     <script src="js/script.js"></script> <!-- Link to external JS file -->
+
+    <script>
+        // ✅ Ensure sliders update values safely
+        document.addEventListener("DOMContentLoaded", function () {
+            const sliders = ["genreWeight", "descWeight", "directorWeight", "castWeight"];
+
+            sliders.forEach(sliderId => {
+                const slider = document.getElementById(sliderId);
+                const valueDisplay = document.getElementById(sliderId + "Value");
+
+                if (slider && valueDisplay) { // ✅ Prevent errors if element doesn't exist
+                    slider.addEventListener("input", function () {
+                        valueDisplay.innerText = this.value;
+                    });
+                }
+            });
+        });
+    </script>
 </body>
 </html>

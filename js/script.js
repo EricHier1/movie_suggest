@@ -9,6 +9,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const genreChartDiv = document.getElementById("genreChart");
     const featureImportanceDiv = document.getElementById("featureImportance");
 
+    // Get slider elements
+    const genreSlider = document.getElementById("genreWeight");
+    const descSlider = document.getElementById("descWeight");
+    const directorSlider = document.getElementById("directorWeight");
+    const castSlider = document.getElementById("castWeight");
+
     getBtn.addEventListener("click", () => handleMovieSearch());
     movieInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") handleMovieSearch();
@@ -69,15 +75,18 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // ✅ Fetch Genre Chart
     async function fetchGenreChart(title) {
         if (!title) return;
         console.log("Fetching genre chart for:", title);
-
+    
         try {
             const response = await fetch(`http://127.0.0.1:5000/genre-distribution?title=${encodeURIComponent(title)}`);
+    
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+    
             const data = await response.json();
-
             genreChartDiv.innerHTML = data.genre_chart
                 ? `<h3>Genre Distribution for '${title}'</h3><img src="${data.genre_chart}" class="img-fluid" alt="Genre Distribution Chart">`
                 : `<p>${data.error || "No genre data available."}</p>`;
@@ -86,6 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
             genreChartDiv.innerHTML = `<p>Error loading genre distribution chart.</p>`;
         }
     }
+    
 
     // ✅ Fetch Cosine Similarity Heatmap
     async function fetchCosineHeatmap(title) {
@@ -115,8 +125,14 @@ document.addEventListener("DOMContentLoaded", function () {
         loadingIndicator.style.display = "block";
         autocompleteBox.style.display = "none";
 
+        // ✅ Get slider values
+        const genreWeight = genreSlider.value;
+        const descWeight = descSlider.value;
+        const directorWeight = directorSlider.value;
+        const castWeight = castSlider.value;
+
         try {
-            const response = await fetch(`http://127.0.0.1:5000/recommend?title=${encodeURIComponent(title)}`);
+            const response = await fetch(`http://127.0.0.1:5000/recommend?title=${encodeURIComponent(title)}&genreWeight=${genreWeight}&descWeight=${descWeight}&directorWeight=${directorWeight}&castWeight=${castWeight}`);
             const data = await response.json();
             loadingIndicator.style.display = "none";
 
@@ -145,7 +161,6 @@ document.addEventListener("DOMContentLoaded", function () {
             errorMessage.textContent = "An error occurred. Please try again.";
         }
     }
-
 
     // ✅ Fetch Feature Importance Chart
     async function fetchFeatureImportance(title) {
