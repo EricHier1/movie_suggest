@@ -12,33 +12,29 @@ import numpy as np
 from io import BytesIO
 import base64
 
-
+# Initialize Flask App
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-
-# Load dataset
+# Load Dataset
 df = pd.read_csv("netflix_titles.csv")
 df.fillna("", inplace=True)
 df["content"] = df["listed_in"] + " " + df["description"]
 
-# Apply TF-IDF and Cosine Similarity
+# Apply TF-IDF and Compute Cosine Similarity
 tfidf = TfidfVectorizer(stop_words="english")
 tfidf_matrix = tfidf.fit_transform(df["content"])
-cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+cosine_sim = cosine_similarity(tfidf_matrix)
 
 def get_recommendations(title, top_n=10):
     if title not in df["title"].values:
         return []
-    
+
     idx = df[df["title"] == title].index[0]
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
+    sim_scores = sorted(enumerate(cosine_sim[idx]), key=lambda x: x[1], reverse=True)[1:top_n+1]
     movie_indices = [i[0] for i in sim_scores]
 
-    recommendations = df.iloc[movie_indices][["title", "listed_in", "description"]].to_dict(orient="records")
-    
-    return recommendations
+    return df.iloc[movie_indices][["title", "listed_in", "description"]].to_dict(orient="records")
 
 @app.route("/recommend", methods=["GET"])
 def recommend():
@@ -62,22 +58,17 @@ def cosine_heatmap():
         return jsonify({"error": "Movie not found"})
 
     idx = df[df["title"] == movie_title].index[0]
-    sim_scores = list(enumerate(cosine_sim[idx]))
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:10]  # Top 10 most similar
-    
+    sim_scores = sorted(enumerate(cosine_sim[idx]), key=lambda x: x[1], reverse=True)[1:10]
     movie_indices = [i[0] for i in sim_scores]
     movie_names = df.iloc[movie_indices]["title"].tolist()
 
-    # Create similarity matrix
     similarity_matrix = cosine_sim[np.ix_(movie_indices, movie_indices)]
 
-    # Plot heatmap
     plt.figure(figsize=(10, 8))
     sns.heatmap(similarity_matrix, annot=True, xticklabels=movie_names, yticklabels=movie_names, cmap="coolwarm")
     plt.xticks(rotation=45, ha="right")
     plt.title(f"Cosine Similarity Heatmap for '{movie_title}'")
 
-    # Save plot to a byte stream
     img = BytesIO()
     plt.savefig(img, format="png", bbox_inches="tight")
     img.seek(0)
@@ -88,23 +79,19 @@ def cosine_heatmap():
 @app.route("/genre-distribution", methods=["GET"])
 def genre_distribution():
     movie_title = request.args.get("title")
-    if not movie_title or movie_title not in df["title"].values:
-        return jsonify({"error": "Movie not found"}), 404  # Return 404 if the movie is missing
+    if movie_title not in df["title"].values:
+        return jsonify({"error": "Movie not found"}), 404
 
-    # Get genres for the specific movie
     movie_genres = df[df["title"] == movie_title]["listed_in"].values[0]
     if not movie_genres:
         return jsonify({"error": "No genres available for this movie."}), 404
 
-    # Split genres and count occurrences
     genre_counts = pd.Series(movie_genres.split(", ")).value_counts()
 
-    # Create pie chart for the selected movie
     plt.figure(figsize=(8, 8))
     plt.pie(genre_counts, labels=genre_counts.index, autopct="%1.1f%%", colors=sns.color_palette("pastel"))
     plt.title(f"Genre Distribution for '{movie_title}'")
 
-    # Save plot to a byte stream
     img = BytesIO()
     plt.savefig(img, format="png", bbox_inches="tight")
     img.seek(0)
@@ -118,30 +105,24 @@ def feature_importance():
     if movie_title not in df["title"].values:
         return jsonify({"error": "Movie not found"}), 404
 
-    # Get the index of the selected movie
     idx = df[df["title"] == movie_title].index[0]
     
-    # Get the TF-IDF scores for that movie
     feature_array = np.array(tfidf.get_feature_names_out())
     tfidf_scores = tfidf_matrix[idx].toarray().flatten()
-    
-    # Check if we have valid scores
-    if len(tfidf_scores) == 0:
+
+    if tfidf_scores.sum() == 0:
         return jsonify({"error": "No TF-IDF scores found for this movie."}), 500
 
-    # Get top 10 most important words
-    top_indices = tfidf_scores.argsort()[-10:][::-1]
+    top_indices = np.argsort(tfidf_scores)[-10:][::-1]
     top_words = feature_array[top_indices]
     top_scores = tfidf_scores[top_indices]
 
-    # Create bar chart
     plt.figure(figsize=(8, 6))
     plt.barh(top_words[::-1], top_scores[::-1], color="royalblue")
     plt.xlabel("TF-IDF Score")
     plt.ylabel("Words")
     plt.title(f"Top Words in '{movie_title}'")
 
-    # Save plot to a byte stream
     img = BytesIO()
     plt.savefig(img, format="png", bbox_inches="tight")
     img.seek(0)
