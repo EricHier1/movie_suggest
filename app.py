@@ -22,19 +22,30 @@ df.fillna("", inplace=True)
 df["content"] = df["listed_in"] + " " + df["description"]
 
 # Apply TF-IDF and Compute Cosine Similarity
-tfidf = TfidfVectorizer(stop_words="english")
+tfidf = TfidfVectorizer(stop_words="english", max_features=5000, ngram_range=(1, 2))
 tfidf_matrix = tfidf.fit_transform(df["content"])
 cosine_sim = cosine_similarity(tfidf_matrix)
 
 def get_recommendations(title, top_n=10):
+    """Returns a list of recommended movies with scaled similarity scores."""
     if title not in df["title"].values:
         return []
 
-    idx = df[df["title"] == title].index[0]
-    sim_scores = sorted(enumerate(cosine_sim[idx]), key=lambda x: x[1], reverse=True)[1:top_n+1]
-    movie_indices = [i[0] for i in sim_scores]
+    idx = df.index[df["title"] == title].tolist()[0]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:top_n + 1]
 
-    return df.iloc[movie_indices][["title", "listed_in", "description"]].to_dict(orient="records")
+    movie_indices = [i[0] for i in sim_scores]
+    raw_similarities = [score for _, score in sim_scores]  # Get raw similarity scores
+
+    # Normalize similarity scores based on the highest similarity found
+    max_similarity = max(raw_similarities) if raw_similarities else 1  # Prevent division by zero
+    normalized_similarities = [round((score / max_similarity) * 100, 2) for score in raw_similarities]
+
+    recommendations = df.iloc[movie_indices][["title", "listed_in", "description"]].copy()
+    recommendations["similarity"] = normalized_similarities  # Use normalized similarity
+
+    return recommendations.to_dict(orient="records")
 
 @app.route("/recommend", methods=["GET"])
 def recommend():
